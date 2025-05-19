@@ -3,7 +3,7 @@
 	"name": "TagStudio Plugin",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
+	"description": "Allows the user to query and pull files from a TagStudio database.",
 	"author": "Martin Chlopecki",
 	"authorUrl": "https://github.com/mchlopecki/tag-studio-obsidian-plugin",
 	"isDesktopOnly": true
