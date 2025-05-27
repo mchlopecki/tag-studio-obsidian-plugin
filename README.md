@@ -1,7 +1,13 @@
 # Obsidian Tag Studio Plugin
 
-This plugin allows users to query for files within the vault based on the TagStudio tagging system. However, this plugin only allows a user to SQL query on the TagStudio SQLite database. This means users cannot query using the TagStudio query language to search, as its meant to be a quick and dirty solution to incorporate a tagged library of photos to obsidian for quick lookups and group image additions.
+# ⚠ Warning!
+
+This plugin does not work standalone, and requires a modified version of Tag Studio to function. If the modified version gets uploaded to github, then I will link it. Otherwise this repo is mostly here to demonstrate the what a primitive version of a plugin for Tag Studio would behave like. When the TagStudio API is released, this plugin may get revisited. 
+
+# The Plugin
+
+As this plugin was made for myself to organize notes for a game, the plugin currently only allows for a user to query a TagStudio library using the name of a group node in a canvas. No previews, no confirmations, and the contents of the group will be deleted on run.  
 
 # Updates and Future
 
-I do not have the intention of keeping this plugin up to date with newer versions of Obsidian or TagStudio, and new features and fixes are unlikely to be implemented. When the TagStudio API is finished, the project may get revisited, but likely under a new repo that will be linked from here.
+I do not have the intention of keeping this plugin up to date with newer versions of Obsidian or TagStudio, and new features and fixes may not be implemented.
