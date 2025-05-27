@@ -1,134 +1,139 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, ItemView, MarkdownView, Menu, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import path from 'path';
+import { Canvas, CanvasView } from 'src/@types/Canvas';
+import TagStudioCanvasActions from 'src/canvas-tag-actions/canvas-actions';
+import TagStudioSearch from 'src/tag-search/tag-search';
+
+const tsPath = '.TagStudio/ts_library.sqlite'
 
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
-	mySetting: string;
+interface TagStudioPluginSettings {
+    tagStudioExecutableLocation: string;
+    tagStudioLibraryLocation: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: TagStudioPluginSettings = {
+    tagStudioExecutableLocation: '',
+    tagStudioLibraryLocation: ''
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class TagStudioPlugin extends Plugin {
+    settings: TagStudioPluginSettings;
+    __toTagStudioExecutable: string;
+    __canvasTagActions: any;
+    __canvasActions: TagStudioCanvasActions;
+    __searchActions: TagStudioSearch;
 
-	async onload() {
-		await this.loadSettings();
+    searchStatus: HTMLSpanElement;
+    cursorPosition: HTMLSpanElement;
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+    async onload() {
+        await this.loadSettings();
+        this.addSettingTab(new TagStudioPluginSettingsTab(this.app, this));
+        this.__toTagStudioExecutable = path.relative('', this.settings.tagStudioExecutableLocation);
+        // overwrites setting, yikes
+        // also I should look into per vault settings
+        if (!this.settings.tagStudioLibraryLocation) {
+            this.settings.tagStudioLibraryLocation = (this.app.vault.adapter as any).basePath
+        }
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+        this.searchStatus = this.addStatusBarItem().createEl("span");
+        this.cursorPosition = this.addStatusBarItem().createEl("span");
+        try {
+            this.__canvasActions = new TagStudioCanvasActions(this);
+            this.__searchActions = new TagStudioSearch(this);
+        } catch (e) {
+            console.error('Error initializing Tag Studio Plugin', e);
+        }
 
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
+        this.registerEvent(
+            this.app.workspace.on('canvas:selection-menu', (menu, canvas) => {
+                menu.addItem((item)=> {
+                    item
+                    .setTitle('Get Cursor Position')
+                    .onClick(async () => {
+                        console.log(canvas.pointer)
+                    })
+                })
+            })
+        )
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
+        this.registerInterval(window.setInterval(() => {
+                // @ts-ignore
+                let canvas = this.app.workspace.getLeavesOfType('canvas')[0].view.canvas
+                if (canvas) {
+                    let x = Math.round(canvas.pointer.x);
+                    let y = Math.round(canvas.pointer.y);
+                    this.cursorPosition.setText(`cursor x:${x} y:${y}`)
+                } else {
+                    this.cursorPosition.setText("")
+                }
+            },
+            10));
+    }
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+    onunload() {
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
+    }
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
 
-	onunload() {
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
 
-	}
+    // Credit to Developer-Mike from https://github.com/Developer-Mike/obsidian-advanced-canvas/
+    // Source: https://github.com/Developer-Mike/obsidian-advanced-canvas/blob/main/src/main.ts
+    getCurrentCanvasView(): CanvasView | null {
+    const canvasView = this.app.workspace.getActiveViewOfType(ItemView)
+        if (canvasView?.getViewType() !== 'canvas') return null
+        return canvasView as CanvasView
+    }
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+    // Credit to Developer-Mike from https://github.com/Developer-Mike/obsidian-advanced-canvas/
+    // Source: https://github.com/Developer-Mike/obsidian-advanced-canvas/blob/main/src/main.ts
+    getCurrentCanvas(): Canvas | null {
+        return this.getCurrentCanvasView()?.canvas || null
+    }
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+class TagStudioPluginSettingsTab extends PluginSettingTab {
+    plugin: TagStudioPlugin;
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+    constructor(app: App, plugin: TagStudioPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
+    display(): void {
+        const {containerEl} = this;
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+        containerEl.empty();
 
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+        new Setting(containerEl)
+            .setName('.TagStudio Executable Location')
+            .setDesc('Location of the .TagStudio executable (Required)')
+            .addText(text => text
+                .setPlaceholder('')
+                .setValue(this.plugin.settings.tagStudioExecutableLocation)
+                .onChange(async (value) => {
+                    this.plugin.settings.tagStudioExecutableLocation = value;
+                    await this.plugin.saveSettings();
+                }));
+        
+        new Setting(containerEl)
+            .setName('.TagStudio Library Location')
+            .setDesc('Location of the .TagStudio folder, defaults to root if unspecified')
+            .addText(text => text
+                .setPlaceholder('')
+                .setValue(this.plugin.settings.tagStudioLibraryLocation)
+                .onChange(async (value) => {
+                    this.plugin.settings.tagStudioLibraryLocation = value;
+                    await this.plugin.saveSettings();
+                }));
+        
+    }
 }
